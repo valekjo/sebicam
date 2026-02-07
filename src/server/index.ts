@@ -21,12 +21,12 @@ try {
 
 const app = express();
 
-// Serve static files from public/
-app.use(express.static(path.resolve(import.meta.dirname, '../../public')));
+// Serve static files from docs/
+app.use(express.static(path.resolve(import.meta.dirname, '../../docs')));
 
 // Serve index page at root
 app.get('/', (_req, res) => {
-  res.sendFile(path.resolve(import.meta.dirname, '../../public/index.html'));
+  res.sendFile(path.resolve(import.meta.dirname, '../../docs/index.html'));
 });
 
 const server = https.createServer(tlsOptions, app);
