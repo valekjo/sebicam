@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Sebicam - Broadcaster</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <h1>Sebicam <span>broadcaster</span></h1>
+
+  <div id="msg" class="message hidden"></div>
+
+  <div class="video-container hidden" id="video-container">
+    <video id="preview" autoplay playsinline muted></video>
+    <div id="video-placeholder" class="video-placeholder">Camera off</div>
+  </div>
+
+  <div class="status-panel" id="status-panel">
+    <div class="status-badge" id="badge-connection">
+      <span class="dot" id="dot-connection"></span>
+      <span id="text-connection">Disconnected</span>
+    </div>
+    <div class="status-badge" id="badge-battery">
+      <span id="text-battery">Battery: --</span>
+    </div>
+    <div class="status-badge" id="badge-viewer">
+      <span class="dot" id="dot-viewer"></span>
+      <span id="text-viewer">No viewer</span>
+    </div>
+    <div class="status-badge">
+      <span id="text-duration">0:00</span>
+    </div>
+    <div class="status-badge">
+      Audio
+      <div class="audio-meter"><div class="audio-meter-fill" id="audio-meter"></div></div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="btn-start" class="btn btn-primary">Start</button>
+    <button id="btn-camera" class="btn btn-secondary hidden">Enable Camera</button>
+    <button id="btn-stop" class="btn btn-danger hidden">Stop</button>
+  </div>
+
+  <div class="qr-area" id="qr-area">
+    <div id="qr-container" class="hidden"></div>
+    <p id="qr-label" class="hidden" style="color: var(--text-muted); font-size: 0.85rem;">Scan with Phone B to view</p>
+  </div>
+
+  <script src="/lib/qrcode.min.js"></script>
+  <script type="module" src="/js/broadcaster.js"></script>
+</body>
+</html>

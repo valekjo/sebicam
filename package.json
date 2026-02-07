@@ -1,0 +1,23 @@
+{
+  "name": "sebicam",
+  "version": "1.0.0",
+  "description": "Local-network baby monitor via WebRTC",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/server/index.ts",
+    "generate-cert": "bash scripts/generate-cert.sh"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.9.0",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

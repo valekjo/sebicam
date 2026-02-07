@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Sebicam</title>
+  <link rel="stylesheet" href="/css/styles.css">
+  <style>
+    .home {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: 32px;
+    }
+    .home h1 {
+      font-size: 1.8rem;
+      margin-bottom: 0;
+    }
+    .home p {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      text-align: center;
+      max-width: 320px;
+      line-height: 1.5;
+    }
+    .role-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      background: var(--bg-card);
+      border: 1px solid #333;
+      border-radius: var(--radius);
+      padding: 28px 24px;
+      width: 100%;
+      max-width: 320px;
+      text-decoration: none;
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .role-card:active {
+      background: var(--bg-elevated);
+      border-color: var(--accent);
+    }
+    .role-icon {
+      font-size: 2.4rem;
+      line-height: 1;
+    }
+    .role-card h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+    }
+    .role-card span {
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="home">
+    <h1>Sebicam</h1>
+    <p>Local-network baby monitor. Choose a role for this device.</p>
+
+    <a href="/broadcaster.html" class="role-card">
+      <div class="role-icon">&#x1F4F7;</div>
+      <h2>Broadcaster</h2>
+      <span>Place this phone near the baby. Streams camera &amp; mic to the viewer.</span>
+    </a>
+
+    <a href="/viewer.html" class="role-card">
+      <div class="role-icon">&#x1F4FA;</div>
+      <h2>Viewer</h2>
+      <span>Watch &amp; listen from another phone. Scan the broadcaster's QR code to connect.</span>
+    </a>
+  </div>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Sebicam - Viewer</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <h1>Sebicam <span>viewer</span></h1>
+
+  <div id="msg" class="message hidden"></div>
+
+  <!-- Scanner section (shown when no room params in URL) -->
+  <div id="scanner-section">
+    <p style="text-align: center; color: var(--text-muted); margin-bottom: var(--gap); font-size: 0.9rem;">
+      Scan the QR code shown on the broadcaster phone
+    </p>
+    <div id="qr-scanner"></div>
+  </div>
+
+  <!-- Stream section (shown after joining room) -->
+  <div id="stream-section" class="hidden">
+    <div class="video-container" id="video-container">
+      <video id="remote-video" autoplay playsinline muted></video>
+      <button class="fullscreen-btn" id="btn-fullscreen" title="Fullscreen">&#x26F6;</button>
+      <button id="unmute-banner" class="unmute-banner hidden">Tap to unmute</button>
+      <div id="video-placeholder" class="video-placeholder">
+        <div class="connecting" id="connecting-msg">
+          <div class="spinner"></div>
+          <span>Connecting...</span>
+        </div>
+        <div id="audio-only-msg" class="hidden" style="text-align: center;">
+          <div style="font-size: 2rem; margin-bottom: 8px;">Audio Only</div>
+          <div style="font-size: 0.85rem;">Broadcaster camera is off</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="status-panel" id="status-panel">
+      <div class="status-badge" id="badge-connection">
+        <span class="dot" id="dot-connection"></span>
+        <span id="text-connection">Connecting</span>
+      </div>
+      <div class="status-badge hidden" id="badge-battery">
+        <span id="text-battery">Battery: --</span>
+      </div>
+      <div class="status-badge">
+        <span id="text-duration">0:00</span>
+      </div>
+      <div class="status-badge">
+        Audio
+        <div class="audio-meter"><div class="audio-meter-fill" id="audio-meter"></div></div>
+      </div>
+      <div class="status-badge" id="badge-quality">
+        <span id="text-quality">Quality: --</span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="btn-scan-again" class="btn btn-secondary hidden">Scan QR Again</button>
+    </div>
+  </div>
+
+  <script src="/lib/html5-qrcode.min.js"></script>
+  <script type="module" src="/js/viewer.js"></script>
+</body>
+</html>
