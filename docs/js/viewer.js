@@ -226,11 +226,16 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Unmute on tap
+// Unmute on tap (user gesture enables AudioContext for spectrogram)
 unmuteBanner.addEventListener('click', () => {
   remoteAudio.muted = false;
   unmuteBanner.style.display = 'none';
   remoteAudio.play().catch(() => {});
+  // Start spectrogram inside user gesture so AudioContext isn't blocked
+  startSpectrogram();
+  if (spectrogramAudioCtx?.state === 'suspended') {
+    spectrogramAudioCtx.resume();
+  }
 });
 
 // QR Scanner
@@ -392,16 +397,15 @@ function setupPeerConnectionHandlers() {
 
       audioStatus.textContent = 'Audio stream active';
 
-      // Start spectrogram visualization
-      startSpectrogram();
-
       // Try autoplay; show unmute banner if it fails
       remoteAudio.play().then(() => {
         console.log('Audio playing');
+        startSpectrogram();
       }).catch(() => {
         console.log('Autoplay blocked, showing unmute banner');
         remoteAudio.muted = true;
         remoteAudio.play().catch(() => {});
+        unmuteBanner.classList.remove('hidden');
         unmuteBanner.style.display = 'block';
       });
     }
