@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <title>Sebicam - Viewer</title>
-  <link rel="stylesheet" href="/css/styles.css">
+  <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
   <h1>Sebicam <span>viewer</span></h1>
@@ -40,6 +40,8 @@
       Tap to enable audio
     </button>
 
+    <canvas id="spectrogram" width="480" height="256"></canvas>
+
     <div class="status-panel" id="status-panel">
       <div class="status-badge" id="badge-connection">
         <span class="dot" id="dot-connection"></span>
@@ -62,8 +64,8 @@
     </div>
   </div>
 
-  <script src="/lib/html5-qrcode.min.js"></script>
-  <script src="/lib/qrcode.min.js"></script>
-  <script type="module" src="/js/viewer.js"></script>
+  <script src="lib/html5-qrcode.min.js"></script>
+  <script src="lib/qrcode.min.js"></script>
+  <script type="module" src="js/viewer.js"></script>
 </body>
 </html>

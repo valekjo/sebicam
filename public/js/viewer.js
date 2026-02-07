@@ -20,6 +20,91 @@ const textBattery = document.getElementById('text-battery');
 const textDuration = document.getElementById('text-duration');
 const audioMeter = document.getElementById('audio-meter');
 
+// Spectrogram
+const spectrogramCanvas = document.getElementById('spectrogram');
+const spectrogramCtx = spectrogramCanvas.getContext('2d');
+let spectrogramAudioCtx = null;
+let spectrogramAnalyser = null;
+let spectrogramSource = null;
+let spectrogramAnimFrame = null;
+
+function heatColor(value) {
+  // 0–255 → black → purple → blue → cyan → green → yellow → red
+  if (value < 32) return [0, 0, value * 4];
+  if (value < 96) { const t = value - 32; return [t * 2, 0, 128 + t * 2]; }
+  if (value < 160) { const t = value - 96; return [0, t * 4, 255 - t * 2]; }
+  if (value < 224) { const t = value - 160; return [t * 4, 255, 0]; }
+  const t = value - 224;
+  return [255, 255 - t * 8, 0];
+}
+
+function startSpectrogram() {
+  if (spectrogramAudioCtx) return; // already running
+
+  const stream = remoteAudio.srcObject;
+  if (!stream) return;
+
+  spectrogramAudioCtx = new AudioContext();
+  if (spectrogramAudioCtx.state === 'suspended') {
+    spectrogramAudioCtx.resume();
+  }
+  spectrogramAnalyser = spectrogramAudioCtx.createAnalyser();
+  spectrogramAnalyser.fftSize = 1024;
+  spectrogramAnalyser.smoothingTimeConstant = 0.3;
+
+  // Use createMediaStreamSource — createMediaElementSource doesn't work
+  // with WebRTC MediaStream-backed audio elements.
+  // Don't connect to destination: the <audio> element handles playback.
+  spectrogramSource = spectrogramAudioCtx.createMediaStreamSource(stream);
+  spectrogramSource.connect(spectrogramAnalyser);
+
+  const freqData = new Uint8Array(spectrogramAnalyser.frequencyBinCount);
+  const canvas = spectrogramCanvas;
+  const ctx = spectrogramCtx;
+  // Use half of bins (useful audio range)
+  const binCount = Math.floor(spectrogramAnalyser.frequencyBinCount / 2);
+
+  function draw() {
+    spectrogramAnimFrame = requestAnimationFrame(draw);
+    spectrogramAnalyser.getByteFrequencyData(freqData);
+
+    // Scroll existing image 1px left
+    const imageData = ctx.getImageData(1, 0, canvas.width - 1, canvas.height);
+    ctx.putImageData(imageData, 0, 0);
+
+    // Draw new rightmost column
+    for (let i = 0; i < canvas.height; i++) {
+      // Map canvas row to frequency bin (low freq at bottom)
+      const binIndex = Math.floor((1 - i / canvas.height) * binCount);
+      const [r, g, b] = heatColor(freqData[binIndex]);
+      ctx.fillStyle = `rgb(${r},${g},${b})`;
+      ctx.fillRect(canvas.width - 1, i, 1, 1);
+    }
+  }
+
+  draw();
+}
+
+function stopSpectrogram() {
+  if (spectrogramAnimFrame) {
+    cancelAnimationFrame(spectrogramAnimFrame);
+    spectrogramAnimFrame = null;
+  }
+  if (spectrogramAnalyser) {
+    spectrogramAnalyser.disconnect();
+    spectrogramAnalyser = null;
+  }
+  if (spectrogramSource) {
+    spectrogramSource.disconnect();
+    spectrogramSource = null;
+  }
+  if (spectrogramAudioCtx) {
+    spectrogramAudioCtx.close();
+    spectrogramAudioCtx = null;
+  }
+  spectrogramCtx.clearRect(0, 0, spectrogramCanvas.width, spectrogramCanvas.height);
+}
+
 // State
 let pc = null;
 let dcSignaling = null;
@@ -307,6 +392,9 @@ function setupPeerConnectionHandlers() {
 
       audioStatus.textContent = 'Audio stream active';
 
+      // Start spectrogram visualization
+      startSpectrogram();
+
       // Try autoplay; show unmute banner if it fails
       remoteAudio.play().then(() => {
         console.log('Audio playing');
@@ -348,6 +436,7 @@ function setupPeerConnectionHandlers() {
 }
 
 function closePeerConnection() {
+  stopSpectrogram();
   if (pc) {
     pc.close();
     pc = null;

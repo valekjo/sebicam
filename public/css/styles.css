@@ -123,6 +123,18 @@ h1 span {
   border-radius: var(--radius);
 }
 
+/* Spectrogram */
+#spectrogram {
+  width: 100%;
+  max-width: 480px;
+  height: 256px;
+  margin: 0 auto;
+  display: block;
+  border-radius: 8px;
+  background: #000;
+  margin-bottom: var(--gap);
+}
+
 /* Status panel */
 .status-panel {
   display: flex;
