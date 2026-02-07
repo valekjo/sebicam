@@ -9,20 +9,10 @@ export const ICE_CONFIG = {
 
 /**
  * Create a configured RTCPeerConnection
- * @param {SignalingClient} signaling
  * @returns {RTCPeerConnection}
  */
-export function createPeerConnection(signaling) {
+export function createPeerConnection() {
   const pc = new RTCPeerConnection(ICE_CONFIG);
-
-  pc.onicecandidate = (event) => {
-    if (event.candidate) {
-      signaling.send({
-        type: 'ice-candidate',
-        candidate: event.candidate.toJSON(),
-      });
-    }
-  };
 
   pc.oniceconnectionstatechange = () => {
     console.log('ICE state:', pc.iceConnectionState);

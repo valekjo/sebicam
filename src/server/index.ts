@@ -3,8 +3,6 @@ import https from 'node:https';
 import path from 'node:path';
 import os from 'node:os';
 import express from 'express';
-import { WebSocketServer } from 'ws';
-import { setupSignaling } from './signaling.js';
 
 const PORT = Number(process.env.PORT) || 3000;
 const CERT_DIR = path.resolve(import.meta.dirname, '../../certs');
@@ -33,9 +31,6 @@ app.get('/', (_req, res) => {
 
 const server = https.createServer(tlsOptions, app);
 
-// WebSocket server on the same HTTPS server
-const wss = new WebSocketServer({ server });
-setupSignaling(wss);
 
 // Detect LAN IP
 function getLanIP(): string {

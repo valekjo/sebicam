@@ -83,6 +83,7 @@ h1 span {
   color: var(--text-muted);
   font-size: 1rem;
   background: #000;
+  pointer-events: none;
 }
 
 /* QR Code area */
@@ -99,7 +100,8 @@ h1 span {
   border-radius: 8px;
 }
 
-#qr-container {
+#qr-container,
+#answer-qr-container {
   background: #fff;
   padding: 12px;
   border-radius: 8px;
@@ -107,7 +109,8 @@ h1 span {
 }
 
 /* QR Scanner */
-#qr-scanner {
+#qr-scanner,
+#response-scanner {
   width: 100%;
   max-width: 400px;
   margin: 0 auto var(--gap);
@@ -115,7 +118,8 @@ h1 span {
   overflow: hidden;
 }
 
-#qr-scanner video {
+#qr-scanner video,
+#response-scanner video {
   border-radius: var(--radius);
 }
 

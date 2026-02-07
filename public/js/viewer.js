@@ -1,15 +1,17 @@
-import { SignalingClient } from './signaling-client.js';
-import { createPeerConnection, getConnectionStats } from './webrtc-common.js';
+import { createPeerConnection } from './webrtc-common.js';
+import { decodeSDP, encodeSDP, waitForICEGathering, isCompactSDP } from './sdp-codec.js';
+import { DataChannelSignaling } from './data-channel.js';
 
 // DOM elements
-const remoteVideo = document.getElementById('remote-video');
-const placeholder = document.getElementById('video-placeholder');
+const remoteAudio = document.getElementById('remote-audio');
+const audioStatus = document.getElementById('audio-status');
 const scannerSection = document.getElementById('scanner-section');
 const streamSection = document.getElementById('stream-section');
-const btnFullscreen = document.getElementById('btn-fullscreen');
 const btnScanAgain = document.getElementById('btn-scan-again');
 const unmuteBanner = document.getElementById('unmute-banner');
 const msgEl = document.getElementById('msg');
+const answerQrContainer = document.getElementById('answer-qr-container');
+const answerQrLabel = document.getElementById('answer-qr-label');
 
 // Status elements
 const dotConnection = document.getElementById('dot-connection');
@@ -17,16 +19,12 @@ const textConnection = document.getElementById('text-connection');
 const textBattery = document.getElementById('text-battery');
 const textDuration = document.getElementById('text-duration');
 const audioMeter = document.getElementById('audio-meter');
-const textQuality = document.getElementById('text-quality');
 
 // State
-let signaling = null;
 let pc = null;
+let dcSignaling = null;
 let scanner = null;
-let statsInterval = null;
 let wakeLock = null;
-let roomId = null;
-let authTokenValue = null;
 
 function showMsg(text, type = 'error') {
   msgEl.textContent = text;
@@ -61,7 +59,6 @@ let noSleepVideo = null;
 let silentAudioCtx = null;
 let silentOscillator = null;
 
-// Keep alive: Wake Lock + silent video + silent audio + Media Session
 async function requestWakeLock() {
   if ('wakeLock' in navigator) {
     try {
@@ -89,7 +86,6 @@ async function requestWakeLock() {
   }
   noSleepVideo.play().catch(() => {});
 
-  // Silent audio keeps page alive when screen is locked (Android Chrome)
   if (!silentAudioCtx) {
     try {
       silentAudioCtx = new AudioContext();
@@ -136,7 +132,6 @@ function releaseWakeLock() {
   }
 }
 
-// Re-acquire when page becomes visible again
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && pc) {
     if (!wakeLock) requestWakeLock();
@@ -146,30 +141,19 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// Unmute on tap — must call play() within the user gesture for Chrome to allow audio
+// Unmute on tap
 unmuteBanner.addEventListener('click', () => {
-  remoteVideo.muted = false;
-  remoteVideo.play().then(() => {
-    unmuteBanner.classList.add('hidden');
-  }).catch(() => {
-    remoteVideo.muted = true;
-  });
-});
-
-// Fullscreen toggle
-btnFullscreen.addEventListener('click', () => {
-  const container = document.getElementById('video-container');
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
-  } else {
-    container.requestFullscreen?.() || container.webkitRequestFullscreen?.();
-  }
+  remoteAudio.muted = false;
+  unmuteBanner.style.display = 'none';
+  remoteAudio.play().catch(() => {});
 });
 
 // QR Scanner
 function startScanner() {
   scannerSection.classList.remove('hidden');
   streamSection.classList.add('hidden');
+  answerQrContainer.classList.add('hidden');
+  answerQrLabel.classList.add('hidden');
 
   scanner = new Html5Qrcode('qr-scanner');
   scanner.start(
@@ -193,65 +177,96 @@ function stopScanner() {
   }
 }
 
-function handleQRCode(text) {
-  try {
-    const url = new URL(text);
-    const room = url.searchParams.get('room');
-    const token = url.searchParams.get('token');
-    if (room && token) {
-      stopScanner();
-      joinRoom(room, token);
-    }
-  } catch {
-    // Not a valid URL, ignore
+async function handleQRCode(text) {
+  if (isCompactSDP(text)) {
+    stopScanner();
+    await handleCompactOffer(text);
   }
 }
 
-// Check URL params on load
-function checkURLParams() {
-  const params = new URLSearchParams(location.search);
-  const room = params.get('room');
-  const token = params.get('token');
-  if (room && token) {
-    joinRoom(room, token);
-    return true;
-  }
-  return false;
-}
-
-// Join room via signaling
-function joinRoom(room, token) {
-  roomId = room;
-  authTokenValue = token;
-
+async function handleCompactOffer(encoded) {
   scannerSection.classList.add('hidden');
-  streamSection.classList.remove('hidden');
-  updateConnection('connecting');
+  showMsg('Processing broadcaster signal...', 'info');
+  requestWakeLock();
 
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  signaling = new SignalingClient(`${proto}://${location.host}`);
+  try {
+    const { type, sdp } = decodeSDP(encoded);
+    if (type !== 'offer') {
+      showMsg('Scanned QR is not a broadcaster offer.');
+      return;
+    }
 
-  signaling.on('connected', () => {
-    signaling.send({ type: 'join-room', roomId: room, authToken: token });
-  });
+    closePeerConnection();
+    pc = createPeerConnection();
+    setupPeerConnectionHandlers();
 
-  signaling.on('disconnected', () => {
-    updateConnection('disconnected');
-  });
+    // Listen for data channel from broadcaster
+    pc.ondatachannel = (event) => {
+      dcSignaling = new DataChannelSignaling(event.channel);
+      setupDataChannelHandlers();
+    };
 
-  signaling.on('room-joined', () => {
-    updateConnection('connecting');
+    await pc.setRemoteDescription(new RTCSessionDescription({ type: 'offer', sdp }));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    showMsg('Gathering connection info...', 'info');
+    const desc = await waitForICEGathering(pc);
     hideMsg();
-    showMsg('Waiting for broadcaster to connect...', 'info');
-    requestWakeLock();
+
+    // Encode and display answer QR
+    const answerEncoded = encodeSDP(desc);
+    console.log('Answer QR payload:', answerEncoded.length, 'chars');
+    showAnswerQR(answerEncoded);
+  } catch (err) {
+    showMsg(`Failed to process broadcaster QR: ${err.message}`);
+  }
+}
+
+function showAnswerQR(encoded) {
+  answerQrContainer.innerHTML = '';
+  answerQrContainer.classList.remove('hidden');
+  answerQrLabel.textContent = 'Step 2: Show this QR to the broadcaster phone';
+  answerQrLabel.classList.remove('hidden');
+
+  new QRCode(answerQrContainer, {
+    text: encoded,
+    width: 256,
+    height: 256,
+    colorDark: '#000000',
+    colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.L,
+  });
+}
+
+function setupDataChannelHandlers() {
+  dcSignaling.on('connected', () => {
+    console.log('Data channel open — waiting for audio offer');
   });
 
-  signaling.on('sdp-offer', async (msg) => {
-    hideMsg();
-    await handleOffer(msg.sdp);
+  // Handle audio offer from broadcaster (real SDP, sent over data channel)
+  dcSignaling.on('sdp-offer', async (msg) => {
+    if (!pc) return;
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      // Trickle ICE for renegotiation
+      pc.onicecandidate = (event) => {
+        if (event.candidate && dcSignaling?.connected) {
+          dcSignaling.send({ type: 'ice-candidate', candidate: event.candidate.toJSON() });
+        }
+      };
+
+      dcSignaling.send({ type: 'sdp-answer', sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
+      console.log('Sent audio answer over data channel');
+    } catch (err) {
+      console.warn('Failed to handle audio offer:', err);
+    }
   });
 
-  signaling.on('ice-candidate', async (msg) => {
+  dcSignaling.on('ice-candidate', async (msg) => {
     if (pc) {
       try {
         await pc.addIceCandidate(msg.candidate);
@@ -261,11 +276,11 @@ function joinRoom(room, token) {
     }
   });
 
-  signaling.on('status-update', (msg) => {
+  dcSignaling.on('status-update', (msg) => {
     const s = msg.status;
     if (s.battery) {
       const pct = Math.round(s.battery.level * 100);
-      const icon = s.battery.charging ? '⚡' : '';
+      const icon = s.battery.charging ? '\u26A1' : '';
       textBattery.textContent = `Battery: ${pct}%${icon}`;
       document.getElementById('badge-battery').classList.remove('hidden');
     }
@@ -276,76 +291,31 @@ function joinRoom(room, token) {
       textDuration.textContent = formatDuration(s.streamDuration);
     }
   });
-
-  signaling.on('broadcaster-left', () => {
-    showMsg('Broadcaster disconnected.', 'error');
-    updateConnection('disconnected');
-    closePeerConnection();
-    btnScanAgain.classList.remove('hidden');
-    releaseWakeLock();
-  });
-
-  signaling.on('error', (msg) => {
-    showMsg(msg.message);
-    if (msg.message === 'Invalid auth token' || msg.message === 'Room not found') {
-      btnScanAgain.classList.add('hidden');
-    }
-  });
-
-  signaling.connect();
-}
-
-async function handleOffer(sdp) {
-  const isRenegotiation = pc && pc.signalingState !== 'closed';
-
-  if (!isRenegotiation) {
-    closePeerConnection();
-    pc = createPeerConnection(signaling);
-    setupPeerConnectionHandlers();
-  }
-
-  await pc.setRemoteDescription(new RTCSessionDescription(sdp));
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  signaling.send({ type: 'sdp-answer', sdp: { type: pc.localDescription.type, sdp: pc.localDescription.sdp } });
-
-  // Check if the offer includes video
-  const hasVideo = sdp.sdp && sdp.sdp.includes('m=video') && !sdp.sdp.includes('m=video 0');
-  showVideoState(hasVideo);
 }
 
 function setupPeerConnectionHandlers() {
-  const connectingMsg = document.getElementById('connecting-msg');
-  const audioOnlyMsg = document.getElementById('audio-only-msg');
-  let hasReceivedTrack = false;
-
   pc.ontrack = (event) => {
-    console.log('ontrack:', event.track.kind);
+    console.log('ontrack:', event.track.kind, 'readyState:', event.track.readyState, 'muted:', event.track.muted);
 
-    // Use the stream the broadcaster associated with addTrack
-    if (event.streams[0]) {
-      remoteVideo.srcObject = event.streams[0];
-    } else {
-      if (!remoteVideo.srcObject) {
-        remoteVideo.srcObject = new MediaStream();
+    if (event.track.kind === 'audio') {
+      // Attach the remote audio stream
+      if (event.streams[0]) {
+        remoteAudio.srcObject = event.streams[0];
+      } else {
+        remoteAudio.srcObject = new MediaStream([event.track]);
       }
-      remoteVideo.srcObject.addTrack(event.track);
-    }
 
-    if (!hasReceivedTrack) {
-      hasReceivedTrack = true;
-      updateConnection('connected');
-      startStatsMonitor();
-      connectingMsg.classList.add('hidden');
-      remoteVideo.play().catch(() => {});
-      unmuteBanner.classList.remove('hidden');
-    }
+      audioStatus.textContent = 'Audio stream active';
 
-    if (event.track.kind === 'video') {
-      showVideoState(true);
-      event.track.onended = () => showVideoState(false);
-      event.track.onmute = () => showVideoState(false);
-      event.track.onunmute = () => showVideoState(true);
+      // Try autoplay; show unmute banner if it fails
+      remoteAudio.play().then(() => {
+        console.log('Audio playing');
+      }).catch(() => {
+        console.log('Autoplay blocked, showing unmute banner');
+        remoteAudio.muted = true;
+        remoteAudio.play().catch(() => {});
+        unmuteBanner.style.display = 'block';
+      });
     }
   };
 
@@ -353,27 +323,28 @@ function setupPeerConnectionHandlers() {
     console.log('ICE state:', pc.iceConnectionState);
     if (pc.iceConnectionState === 'connected') {
       updateConnection('connected');
+      streamSection.classList.remove('hidden');
+      answerQrContainer.classList.add('hidden');
+      answerQrLabel.classList.add('hidden');
     } else if (pc.iceConnectionState === 'failed') {
       showMsg('Connection failed.', 'error');
       updateConnection('disconnected');
+      streamSection.classList.remove('hidden');
+      answerQrContainer.classList.add('hidden');
+      answerQrLabel.classList.add('hidden');
       btnScanAgain.classList.remove('hidden');
     } else if (pc.iceConnectionState === 'disconnected') {
       updateConnection('connecting');
+      pc.restartIce();
+      showMsg('Connection lost, attempting to reconnect...', 'info');
+      setTimeout(() => {
+        if (pc && pc.iceConnectionState !== 'connected') {
+          showMsg('Connection lost. Tap Scan QR Again to reconnect.', 'error');
+          btnScanAgain.classList.remove('hidden');
+        }
+      }, 10000);
     }
   };
-}
-
-function showVideoState(hasVideo) {
-  const audioOnlyMsg = document.getElementById('audio-only-msg');
-  const connectingMsg = document.getElementById('connecting-msg');
-
-  if (hasVideo) {
-    placeholder.classList.add('hidden');
-  } else {
-    connectingMsg.classList.add('hidden');
-    audioOnlyMsg.classList.remove('hidden');
-    placeholder.classList.remove('hidden');
-  }
 }
 
 function closePeerConnection() {
@@ -381,35 +352,10 @@ function closePeerConnection() {
     pc.close();
     pc = null;
   }
-  remoteVideo.srcObject = null;
-  placeholder.classList.remove('hidden');
-  stopStatsMonitor();
-}
-
-function startStatsMonitor() {
-  stopStatsMonitor();
-  statsInterval = setInterval(async () => {
-    if (!pc) return;
-    const stats = await getConnectionStats(pc);
-    if (stats) {
-      const rtt = Math.round(stats.roundTripTime * 1000);
-      if (rtt < 100) {
-        textQuality.textContent = `Quality: Good (${rtt}ms)`;
-      } else if (rtt < 300) {
-        textQuality.textContent = `Quality: Fair (${rtt}ms)`;
-      } else {
-        textQuality.textContent = `Quality: Poor (${rtt}ms)`;
-      }
-    }
-  }, 3000);
-}
-
-function stopStatsMonitor() {
-  if (statsInterval) {
-    clearInterval(statsInterval);
-    statsInterval = null;
+  if (dcSignaling) {
+    dcSignaling = null;
   }
-  textQuality.textContent = 'Quality: --';
+  remoteAudio.srcObject = null;
 }
 
 // Scan again — tear down everything and go back to QR scanner
@@ -417,17 +363,9 @@ btnScanAgain.addEventListener('click', () => {
   btnScanAgain.classList.add('hidden');
   hideMsg();
   closePeerConnection();
-  if (signaling) {
-    signaling.disconnect();
-    signaling = null;
-  }
-  roomId = null;
-  authTokenValue = null;
-  history.replaceState(null, '', location.pathname);
+  releaseWakeLock();
   startScanner();
 });
 
 // Initialize
-if (!checkURLParams()) {
-  startScanner();
-}
+startScanner();

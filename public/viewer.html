@@ -12,31 +12,33 @@
 
   <div id="msg" class="message hidden"></div>
 
-  <!-- Scanner section (shown when no room params in URL) -->
+  <!-- Scanner section (scan broadcaster's QR) -->
   <div id="scanner-section">
     <p style="text-align: center; color: var(--text-muted); margin-bottom: var(--gap); font-size: 0.9rem;">
-      Scan the QR code shown on the broadcaster phone
+      Step 1: Scan the QR code shown on the broadcaster phone
     </p>
     <div id="qr-scanner"></div>
   </div>
 
-  <!-- Stream section (shown after joining room) -->
+  <!-- Answer QR display (show to broadcaster) -->
+  <div class="qr-area">
+    <div id="answer-qr-container" class="hidden"></div>
+    <p id="answer-qr-label" class="hidden" style="color: var(--text-muted); font-size: 0.85rem;"></p>
+  </div>
+
+  <!-- Stream section (shown after connecting) -->
   <div id="stream-section" class="hidden">
-    <div class="video-container" id="video-container">
-      <video id="remote-video" autoplay playsinline muted></video>
-      <button class="fullscreen-btn" id="btn-fullscreen" title="Fullscreen">&#x26F6;</button>
-      <button id="unmute-banner" class="unmute-banner hidden">Tap to unmute</button>
-      <div id="video-placeholder" class="video-placeholder">
-        <div class="connecting" id="connecting-msg">
-          <div class="spinner"></div>
-          <span>Connecting...</span>
-        </div>
-        <div id="audio-only-msg" class="hidden" style="text-align: center;">
-          <div style="font-size: 2rem; margin-bottom: 8px;">Audio Only</div>
-          <div style="font-size: 0.85rem;">Broadcaster camera is off</div>
-        </div>
-      </div>
+    <div style="text-align: center; padding: 24px 0;">
+      <div style="font-size: 2rem; margin-bottom: 8px;">Audio Monitor</div>
+      <div id="audio-status" style="font-size: 0.9rem; color: var(--text-muted);">Waiting for audio...</div>
     </div>
+
+    <!-- Hidden audio element for playback -->
+    <audio id="remote-audio" autoplay></audio>
+    <button id="unmute-banner" class="unmute-banner hidden"
+            style="position:relative; left:auto; bottom:auto; transform:none; margin: 12px auto; display:none;">
+      Tap to enable audio
+    </button>
 
     <div class="status-panel" id="status-panel">
       <div class="status-badge" id="badge-connection">
@@ -53,9 +55,6 @@
         Audio
         <div class="audio-meter"><div class="audio-meter-fill" id="audio-meter"></div></div>
       </div>
-      <div class="status-badge" id="badge-quality">
-        <span id="text-quality">Quality: --</span>
-      </div>
     </div>
 
     <div class="actions">
@@ -64,6 +63,7 @@
   </div>
 
   <script src="/lib/html5-qrcode.min.js"></script>
+  <script src="/lib/qrcode.min.js"></script>
   <script type="module" src="/js/viewer.js"></script>
 </body>
 </html>

@@ -12,11 +12,6 @@
 
   <div id="msg" class="message hidden"></div>
 
-  <div class="video-container hidden" id="video-container">
-    <video id="preview" autoplay playsinline muted></video>
-    <div id="video-placeholder" class="video-placeholder">Camera off</div>
-  </div>
-
   <div class="status-panel" id="status-panel">
     <div class="status-badge" id="badge-connection">
       <span class="dot" id="dot-connection"></span>
@@ -40,16 +35,21 @@
 
   <div class="actions">
     <button id="btn-start" class="btn btn-primary">Start</button>
-    <button id="btn-camera" class="btn btn-secondary hidden">Enable Camera</button>
+    <button id="btn-scan-response" class="btn btn-primary hidden">Scan Response</button>
     <button id="btn-stop" class="btn btn-danger hidden">Stop</button>
   </div>
 
   <div class="qr-area" id="qr-area">
     <div id="qr-container" class="hidden"></div>
-    <p id="qr-label" class="hidden" style="color: var(--text-muted); font-size: 0.85rem;">Scan with Phone B to view</p>
+    <p id="qr-label" class="hidden" style="color: var(--text-muted); font-size: 0.85rem;"></p>
+  </div>
+
+  <div id="scanner-container" class="hidden">
+    <div id="response-scanner"></div>
   </div>
 
   <script src="/lib/qrcode.min.js"></script>
+  <script src="/lib/html5-qrcode.min.js"></script>
   <script type="module" src="/js/broadcaster.js"></script>
 </body>
 </html>
