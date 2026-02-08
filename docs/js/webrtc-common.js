@@ -2,8 +2,9 @@
 
 export const ICE_CONFIG = {
   iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
+    // Commented out manually - ICE servers should not be needed on local network
+    // { urls: 'stun:stun.l.google.com:19302' },
+    // { urls: 'stun:stun1.l.google.com:19302' },
   ],
 };
 
