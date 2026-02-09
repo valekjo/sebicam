@@ -77,5 +77,29 @@
       <span>Watch &amp; listen from another phone. Scan the broadcaster's QR code to connect.</span>
     </a>
   </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').then(function (reg) {
+        // Ask the active SW to check for updates
+        if (reg.active) reg.active.postMessage({ type: 'CHECK_UPDATE' });
+        reg.addEventListener('statechange', function () {
+          if (reg.active) reg.active.postMessage({ type: 'CHECK_UPDATE' });
+        });
+      });
+      navigator.serviceWorker.addEventListener('message', function (event) {
+        if (event.data && event.data.type === 'UPDATE_AVAILABLE') {
+          var banner = document.createElement('div');
+          banner.textContent = 'Update available. Tap to refresh.';
+          banner.style.cssText =
+            'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);' +
+            'background:#2563eb;color:#fff;padding:10px 20px;border-radius:999px;' +
+            'font-size:0.9rem;cursor:pointer;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+          banner.addEventListener('click', function () { window.location.reload(); });
+          document.body.appendChild(banner);
+        }
+      });
+    }
+  </script>
 </body>
 </html>
