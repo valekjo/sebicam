@@ -110,6 +110,7 @@ let pc = null;
 let dcSignaling = null;
 let scanner = null;
 let wakeLock = null;
+let hasEverConnected = false;
 
 function showMsg(text, type = 'error') {
   msgEl.textContent = text;
@@ -332,6 +333,10 @@ function showAnswerQR(encoded) {
 function setupDataChannelHandlers() {
   dcSignaling.on('connected', () => {
     console.log('Data channel open — waiting for audio offer');
+    hasEverConnected = true;
+    streamSection.classList.remove('hidden');
+    answerQrContainer.classList.add('hidden');
+    answerQrLabel.classList.add('hidden');
   });
 
   // Handle audio offer from broadcaster (real SDP, sent over data channel)
@@ -415,16 +420,23 @@ function setupPeerConnectionHandlers() {
     console.log('ICE state:', pc.iceConnectionState);
     if (pc.iceConnectionState === 'connected') {
       updateConnection('connected');
-      streamSection.classList.remove('hidden');
-      answerQrContainer.classList.add('hidden');
-      answerQrLabel.classList.add('hidden');
+      // Don't hide answer QR or set hasEverConnected here — ICE can connect
+      // via peer-reflexive candidates before the broadcaster scans the QR.
+      // Wait for the data channel to open (setupDataChannelHandlers) instead.
     } else if (pc.iceConnectionState === 'failed') {
-      showMsg('Connection failed.', 'error');
-      updateConnection('disconnected');
-      streamSection.classList.remove('hidden');
-      answerQrContainer.classList.add('hidden');
-      answerQrLabel.classList.add('hidden');
-      btnScanAgain.classList.remove('hidden');
+      if (hasEverConnected) {
+        showMsg('Connection failed.', 'error');
+        updateConnection('disconnected');
+        streamSection.classList.remove('hidden');
+        answerQrContainer.classList.add('hidden');
+        answerQrLabel.classList.add('hidden');
+        btnScanAgain.classList.remove('hidden');
+      } else {
+        // ICE failed before ever connecting — broadcaster hasn't scanned the answer QR yet.
+        // Keep QR visible and restart ICE to try again.
+        showMsg('Waiting for broadcaster to scan QR...', 'info');
+        pc.restartIce();
+      }
     } else if (pc.iceConnectionState === 'disconnected') {
       updateConnection('connecting');
       pc.restartIce();
@@ -441,6 +453,7 @@ function setupPeerConnectionHandlers() {
 
 function closePeerConnection() {
   stopSpectrogram();
+  hasEverConnected = false;
   if (pc) {
     pc.close();
     pc = null;
