@@ -38,9 +38,10 @@ Open the printed Network URL (e.g. `https://192.168.1.x:3000`) on both phones. A
 3. A response QR code appears — show it to Phone A to scan
 4. Audio from Phone A starts playing, with a live spectrogram
 
+![Viewer](docs/images/screenshot-viewer.jpg)
+
 ![Spectrogram](docs/images/screenshot-spectrogram.jpg)
 
-![Viewer](docs/images/screenshot-viewer.jpg)
 
 ## Architecture
 
