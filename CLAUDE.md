@@ -42,10 +42,12 @@ This two-phase design exists because compact QR-encoded SDPs can't faithfully re
 
 ### Server (TypeScript, `src/server/`)
 
-- `index.ts` — HTTPS server (self-signed cert) + Express static file serving only. Auto-detects LAN IP. No signaling logic on the server.
+- `index.ts` — HTTPS server (self-signed cert) + Express static file serving from `docs/`. Auto-detects LAN IP. No signaling logic on the server.
 
-### Frontend (Vanilla JS, `public/`)
+### Frontend (Vanilla JS, `docs/`)
 
+- `index.html` — Landing page with role selection (broadcaster vs viewer). Registers the service worker.
+- `sw.js` — Service worker for offline/PWA support. Cache-first strategy with background version checks via `version.json`.
 - `js/sdp-codec.js` — Compact binary SDP encoding (`SBC1:` format v2): extracts DTLS fingerprint, ICE credentials (ufrag/pwd), and up to 3 ICE candidates (IPv4 or mDNS `.local`) into ~100-byte binary, base64url-encoded. Used only for the initial data-channel-only handshake. `decodeAnswerForOffer` transforms the broadcaster's real offer SDP into an answer by substituting the viewer's credentials.
 - `js/data-channel.js` — `DataChannelSignaling` class: RTCDataChannel wrapper with event emitter pattern (`on`/`off`/`send`). Carries `sdp-offer`, `sdp-answer`, `ice-candidate`, and `status-update` messages as JSON.
 - `js/webrtc-common.js` — Shared WebRTC utilities: peer connection factory (Google STUN), connection stats, audio meter via Web Audio API.

@@ -3,3 +3,4 @@ dist/
 certs/
 *.log
 worktrees/
+.DS_Store

@@ -1,21 +1,16 @@
 # Sebicam
 
-Local-network baby monitor. Phone A streams encrypted video/audio; Phone B views it in a browser. Media flows peer-to-peer via WebRTC — the server only handles signaling.
+Local-network baby monitor. Phone A broadcasts encrypted audio via WebRTC; Phone B listens in a browser. Signaling is done by scanning QR codes between the two phones — the server only serves static files. Media flows peer-to-peer.
 
-## Architecture
+![Main screen](docs/images/screenshot-main.jpg)
 
-```
-Phone A (Broadcaster)  <--WebSocket-->  Express+WSS Server  <--WebSocket-->  Phone B (Viewer)
-         \                                                                    /
-          \================== WebRTC P2P (encrypted media) =================/
-```
+## Try It
 
-- **Server**: HTTPS (self-signed cert for LAN) + WebSocket signaling only
-- **Transport**: WebRTC peer-to-peer with built-in DTLS-SRTP encryption
-- **Auth**: Server generates `roomId` + `authToken` per session, encoded in a QR code
-- **No bundler**: Vanilla JS with ES modules
+The app is hosted at **https://valekjo.github.io/sebicam** — open it on both phones and follow the usage steps below.
 
-## Quick Start
+To use it without internet: open the link once on each phone to cache it, then save it to your home screen. One phone can act as a Wi-Fi hotspot for the other — the entire setup works offline since signaling is done via QR codes and media flows directly between the phones.
+
+## Development
 
 ```bash
 npm install
@@ -23,67 +18,66 @@ npm run generate-cert   # one-time: generates self-signed TLS cert in certs/
 npm run dev             # starts HTTPS server on port 3000
 ```
 
-Open the printed Network URL (e.g. `https://192.168.1.x:3000`) on Phone A. Accept the certificate warning, then tap **Start**. A QR code appears — scan it with Phone B to begin viewing.
+Open the printed Network URL (e.g. `https://192.168.1.x:3000`) on both phones. Accept the certificate warning on each device.
 
 ## Usage
 
 ### Phone A — Broadcaster
 
-1. Open `https://<LAN_IP>:3000` on the phone that will be placed near the baby
-2. Allow camera and microphone access
-3. Tap **Start** — camera preview and a QR code appear
-4. Place the phone with a view of the baby
+1. Open the app and choose **Broadcaster**
+2. Allow microphone access
+3. Tap **Start** — a QR code appears
+4. Have Phone B scan this QR code
+5. Tap **Scan Response** to scan Phone B's answer QR code
+6. Audio streaming begins once both QR codes are exchanged
 
 ### Phone B — Viewer
 
-1. Scan the QR code shown on Phone A (any QR scanner app works — the code is a URL)
-2. Accept the certificate warning
-3. Video and audio stream from Phone A appears
+1. Open the app and choose **Viewer**
+2. Scan the QR code shown on Phone A
+3. A response QR code appears — show it to Phone A to scan
+4. Audio from Phone A starts playing, with a live spectrogram
 
-Alternatively, if you already have the URL with `?room=...&token=...` parameters, open it directly — the viewer page will skip the QR scanner and connect automatically.
+![Spectrogram](docs/images/screenshot-spectrogram.jpg)
+
+![Viewer](docs/images/screenshot-viewer.jpg)
+
+## Architecture
+
+```
+Phone A (Broadcaster) ----QR codes----> Phone B (Viewer)
+         \                                    /
+          ======= WebRTC P2P (encrypted) ====
+```
+
+- **Server**: HTTPS static file server only — no signaling logic
+- **Signaling**: Two-way QR code exchange between phones (no server involvement)
+- **Transport**: WebRTC peer-to-peer with DTLS-SRTP encryption
+- **Audio only**: no video streaming
+
+### Two-phase connection
+
+The connection uses a two-phase handshake:
+
+1. **QR-based bootstrap** — Compact binary-encoded SDPs (`SBC1:` format) exchanged via QR codes establish a WebRTC data channel
+2. **Full SDP over data channel** — Once the data channel opens, full browser-generated SDPs are exchanged over it to negotiate audio codecs properly
+
+This design exists because QR-encoded SDPs are too compact to represent all codec/extension details browsers need. The QR exchange only bootstraps connectivity; real media negotiation happens over the data channel.
 
 ## Features
 
 - **Dark theme** — designed for nighttime use
+- **Audio spectrogram** — real-time frequency visualization on the viewer
 - **Battery status** — broadcaster's battery level shown on both phones
 - **Audio level meter** — visual indicator of sound in the room
-- **Connection quality** — round-trip time displayed on the viewer
 - **Stream duration** — elapsed time counter
-- **Wake Lock** — keeps the viewer screen on during monitoring
-- **Fullscreen** — tap the fullscreen button on the viewer video
-- **Auto-reconnect** — WebSocket reconnects automatically on disconnect
-- **Secure by default** — HTTPS required (for `getUserMedia`), WebRTC media encrypted via DTLS-SRTP, auth tokens use `crypto.randomBytes` with timing-safe comparison
-
-## Project Structure
-
-```
-sebicam/
-├── package.json
-├── tsconfig.json
-├── scripts/
-│   └── generate-cert.sh          # Self-signed TLS cert generator
-├── certs/                         # Gitignored — generated TLS certs
-├── src/server/
-│   ├── index.ts                   # HTTPS + Express + WSS entry point
-│   ├── signaling.ts               # Room management, auth, message relay
-│   └── types.ts                   # Signaling message types
-├── public/
-│   ├── broadcaster.html           # Phone A page
-│   ├── viewer.html                # Phone B page
-│   ├── css/styles.css             # Dark theme, mobile-first
-│   ├── js/
-│   │   ├── broadcaster.js         # Camera capture, WebRTC offer, QR generation
-│   │   ├── viewer.js              # QR scan, WebRTC answer, stream display
-│   │   ├── webrtc-common.js       # Shared ICE config, stats, audio meter
-│   │   └── signaling-client.js    # WebSocket client wrapper
-│   └── lib/
-│       ├── qrcode.min.js          # Vendored QR generation (qrcodejs)
-│       └── html5-qrcode.min.js    # Vendored QR scanning (html5-qrcode)
-```
+- **Keep-alive** — Wake Lock + silent audio oscillator + Media Session API to prevent the broadcaster from sleeping
+- **Offline support** — service worker caches all assets for PWA-like usage
+- **Secure by default** — HTTPS required, WebRTC media encrypted via DTLS-SRTP
 
 ## Requirements
 
-- Node.js 18+
+- Node.js 24+ (see `.nvmrc`)
 - Both phones on the same local network
 - openssl (for certificate generation)
 
