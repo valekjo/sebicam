@@ -333,15 +333,25 @@ function showAnswerQR(encoded) {
 function setupDataChannelHandlers() {
   dcSignaling.on('connected', () => {
     console.log('Data channel open — waiting for audio offer');
-    hasEverConnected = true;
-    streamSection.classList.remove('hidden');
-    answerQrContainer.classList.add('hidden');
-    answerQrLabel.classList.add('hidden');
+    // Don't hide the answer QR or transition UI here. On fast LANs, the
+    // data channel can open via peer-reflexive ICE candidates before the
+    // broadcaster has scanned the QR. If that transient connection drops,
+    // the ICE 'failed' handler would hide the QR prematurely (because
+    // hasEverConnected was already true). Wait for the broadcaster to
+    // actively send us an sdp-offer before transitioning the UI.
   });
 
-  // Handle audio offer from broadcaster (real SDP, sent over data channel)
+  // Handle audio offer from broadcaster (real SDP, sent over data channel).
+  // Receiving this message proves the broadcaster's app is actively participating,
+  // so it's now safe to hide the answer QR and transition to the stream view.
   dcSignaling.on('sdp-offer', async (msg) => {
     if (!pc) return;
+    if (!hasEverConnected) {
+      hasEverConnected = true;
+      streamSection.classList.remove('hidden');
+      answerQrContainer.classList.add('hidden');
+      answerQrLabel.classList.add('hidden');
+    }
     try {
       await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
       const answer = await pc.createAnswer();
@@ -433,7 +443,9 @@ function setupPeerConnectionHandlers() {
         btnScanAgain.classList.remove('hidden');
       } else {
         // ICE failed before ever connecting — broadcaster hasn't scanned the answer QR yet.
-        // Keep QR visible and restart ICE to try again.
+        // Keep QR visible. Note: restartIce() requires a new offer/answer exchange to
+        // take effect, which won't happen here (we're the answerer). The connection can
+        // still recover when the broadcaster scans the QR and starts sending ICE checks.
         showMsg('Waiting for broadcaster to scan QR...', 'info');
         pc.restartIce();
       }

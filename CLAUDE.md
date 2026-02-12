@@ -17,6 +17,8 @@ npm run build                # Compile TypeScript to dist/server/ (tsc)
 
 No test framework is configured. No linter is configured.
 
+Always bump the version in `version.json` when updating code. The service worker uses this file to detect updates and refresh its cache.
+
 ## Architecture
 
 ```
