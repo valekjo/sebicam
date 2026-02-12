@@ -38,11 +38,44 @@ function heatColor(value) {
   return [255, 255 - t * 8, 0];
 }
 
+const SPECTROGRAM_DURATION_SEC = 40;
+
+function resizeSpectrogramCanvas() {
+  const canvas = spectrogramCanvas;
+  const rect = canvas.getBoundingClientRect();
+  const w = Math.floor(rect.width);
+  const h = Math.floor(rect.height);
+  if (canvas.width !== w || canvas.height !== h) {
+    // Save existing image data before resize
+    let oldImage = null;
+    const oldW = canvas.width;
+    const oldH = canvas.height;
+    if (oldW > 0 && oldH > 0) {
+      try { oldImage = spectrogramCtx.getImageData(0, 0, oldW, oldH); } catch (e) { /* empty */ }
+    }
+    canvas.width = w;
+    canvas.height = h;
+    // Restore old image stretched/positioned to right edge
+    if (oldImage) {
+      // Create temp canvas to draw old data, then stretch onto new canvas
+      const tmp = document.createElement('canvas');
+      tmp.width = oldW;
+      tmp.height = oldH;
+      tmp.getContext('2d').putImageData(oldImage, 0, 0);
+      // Draw old image aligned to the right edge, scaling height to fit
+      const srcW = Math.min(oldW, w);
+      spectrogramCtx.drawImage(tmp, oldW - srcW, 0, srcW, oldH, w - srcW, 0, srcW, h);
+    }
+  }
+}
+
 function startSpectrogram() {
   if (spectrogramAudioCtx) return; // already running
 
   const stream = remoteAudio.srcObject;
   if (!stream) return;
+
+  resizeSpectrogramCanvas();
 
   spectrogramAudioCtx = new AudioContext();
   if (spectrogramAudioCtx.state === 'suspended') {
@@ -52,37 +85,49 @@ function startSpectrogram() {
   spectrogramAnalyser.fftSize = 1024;
   spectrogramAnalyser.smoothingTimeConstant = 0.3;
 
-  // Use createMediaStreamSource — createMediaElementSource doesn't work
-  // with WebRTC MediaStream-backed audio elements.
-  // Don't connect to destination: the <audio> element handles playback.
   spectrogramSource = spectrogramAudioCtx.createMediaStreamSource(stream);
   spectrogramSource.connect(spectrogramAnalyser);
 
   const freqData = new Uint8Array(spectrogramAnalyser.frequencyBinCount);
   const canvas = spectrogramCanvas;
   const ctx = spectrogramCtx;
-  // Use half of bins (useful audio range)
   const binCount = Math.floor(spectrogramAnalyser.frequencyBinCount / 2);
 
-  function draw() {
+  let lastColumnTime = 0;
+
+  function draw(timestamp) {
     spectrogramAnimFrame = requestAnimationFrame(draw);
+    resizeSpectrogramCanvas();
+
+    // Time-based drawing: calculate ms per pixel column
+    const msPerColumn = (SPECTROGRAM_DURATION_SEC * 1000) / canvas.width;
+    if (!lastColumnTime) { lastColumnTime = timestamp; return; }
+
+    const elapsed = timestamp - lastColumnTime;
+    const columnsToDraw = Math.floor(elapsed / msPerColumn);
+    if (columnsToDraw < 1) return;
+    lastColumnTime += columnsToDraw * msPerColumn;
+
     spectrogramAnalyser.getByteFrequencyData(freqData);
 
-    // Scroll existing image 1px left
-    const imageData = ctx.getImageData(1, 0, canvas.width - 1, canvas.height);
-    ctx.putImageData(imageData, 0, 0);
+    // Scroll existing image left by columnsToDraw pixels
+    if (columnsToDraw < canvas.width) {
+      const imageData = ctx.getImageData(columnsToDraw, 0, canvas.width - columnsToDraw, canvas.height);
+      ctx.putImageData(imageData, 0, 0);
+    } else {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 
-    // Draw new rightmost column
+    // Draw new columns on the right
     for (let i = 0; i < canvas.height; i++) {
-      // Map canvas row to frequency bin (low freq at bottom)
       const binIndex = Math.floor((1 - i / canvas.height) * binCount);
       const [r, g, b] = heatColor(freqData[binIndex]);
       ctx.fillStyle = `rgb(${r},${g},${b})`;
-      ctx.fillRect(canvas.width - 1, i, 1, 1);
+      ctx.fillRect(canvas.width - columnsToDraw, i, columnsToDraw, 1);
     }
   }
 
-  draw();
+  spectrogramAnimFrame = requestAnimationFrame(draw);
 }
 
 function stopSpectrogram() {
@@ -410,7 +455,7 @@ function setupPeerConnectionHandlers() {
         remoteAudio.srcObject = new MediaStream([event.track]);
       }
 
-      audioStatus.textContent = 'Audio stream active';
+      audioStatus.classList.add('hidden');
 
       // Try autoplay; show unmute banner if it fails
       remoteAudio.play().then(() => {

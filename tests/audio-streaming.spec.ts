@@ -149,8 +149,11 @@ test('audio flows from broadcaster to viewer and shows on spectrogram', async ({
     });
 
     const singleTone = await analyzeSpectrogram(viewer);
-    const single1kHz = maxInRange(singleTone, 220, 245);
-    const single4kHz = maxInRange(singleTone, 155, 185);
+    const { row1kHz, row4kHz } = await getFrequencyRows(viewer);
+    const margin = Math.max(5, Math.round(singleTone.length * 0.05));
+    const single1kHz = maxInRange(singleTone, row1kHz - margin, row1kHz + margin);
+    const single4kHz = maxInRange(singleTone, row4kHz - margin, row4kHz + margin);
+    console.log(`Canvas height=${singleTone.length}, row1kHz=${row1kHz}, row4kHz=${row4kHz}, margin=${margin}`);
     console.log('Single-tone: 1kHz max =', single1kHz, ', 4kHz max =', single4kHz);
 
     expect(single1kHz, 'Expected bright 1000 Hz band').toBeGreaterThan(50);
@@ -176,8 +179,8 @@ test('audio flows from broadcaster to viewer and shows on spectrogram', async ({
     });
 
     const dualTone = await analyzeSpectrogram(viewer);
-    const dual1kHz = maxInRange(dualTone, 220, 245);
-    const dual4kHz = maxInRange(dualTone, 155, 185);
+    const dual1kHz = maxInRange(dualTone, row1kHz - margin, row1kHz + margin);
+    const dual4kHz = maxInRange(dualTone, row4kHz - margin, row4kHz + margin);
     console.log('Dual-tone: 1kHz max =', dual1kHz, ', 4kHz max =', dual4kHz);
 
     expect(dual1kHz, 'Expected bright 1000 Hz band').toBeGreaterThan(50);
@@ -213,8 +216,29 @@ async function analyzeSpectrogram(page: Page): Promise<number[]> {
 /** Maximum luminance in a row range (inclusive). */
 function maxInRange(luminance: number[], startRow: number, endRow: number): number {
   let max = 0;
-  for (let i = startRow; i <= endRow && i < luminance.length; i++) {
+  const lo = Math.max(0, startRow);
+  const hi = Math.min(luminance.length - 1, endRow);
+  for (let i = lo; i <= hi; i++) {
     if (luminance[i] > max) max = luminance[i];
   }
   return max;
+}
+
+/** Compute canvas row indices for 1 kHz and 4 kHz based on actual canvas/analyser dimensions. */
+async function getFrequencyRows(page: Page): Promise<{ row1kHz: number; row4kHz: number }> {
+  return page.evaluate(() => {
+    const canvas = document.getElementById('spectrogram') as HTMLCanvasElement;
+    // Match the analyser config in viewer.js: fftSize=1024, uses half of frequencyBinCount
+    const fftSize = 1024;
+    const sampleRate = 48000; // browser default
+    const binCount = fftSize / 2 / 2; // frequencyBinCount/2 = 256
+    const freqPerBin = sampleRate / fftSize; // ~46.875 Hz
+
+    function freqToRow(freqHz: number): number {
+      const binIndex = freqHz / freqPerBin;
+      return Math.round(canvas.height * (1 - binIndex / binCount));
+    }
+
+    return { row1kHz: freqToRow(1000), row4kHz: freqToRow(4000) };
+  });
 }

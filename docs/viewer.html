@@ -28,39 +28,37 @@
 
   <!-- Stream section (shown after connecting) -->
   <div id="stream-section" class="hidden">
-    <div style="text-align: center; padding: 24px 0;">
-      <div style="font-size: 2rem; margin-bottom: 8px;">Audio Monitor</div>
-      <div id="audio-status" style="font-size: 0.9rem; color: var(--text-muted);">Waiting for audio...</div>
-    </div>
-
     <!-- Hidden audio element for playback -->
     <audio id="remote-audio" autoplay></audio>
-    <button id="unmute-banner" class="unmute-banner hidden"
-            style="position:relative; left:auto; bottom:auto; transform:none; margin: 12px auto; display:none;">
-      Tap to enable audio
-    </button>
 
-    <canvas id="spectrogram" width="480" height="256"></canvas>
-
-    <div class="status-panel" id="status-panel">
-      <div class="status-badge" id="badge-connection">
-        <span class="dot" id="dot-connection"></span>
-        <span id="text-connection">Connecting</span>
-      </div>
-      <div class="status-badge hidden" id="badge-battery">
-        <span id="text-battery">Battery: --</span>
-      </div>
-      <div class="status-badge">
-        <span id="text-duration">0:00</span>
-      </div>
-      <div class="status-badge">
-        Audio
-        <div class="audio-meter"><div class="audio-meter-fill" id="audio-meter"></div></div>
-      </div>
+    <div class="spectrogram-area">
+      <canvas id="spectrogram"></canvas>
+      <div id="audio-status" class="spectrogram-overlay">Waiting for audio...</div>
+      <button id="unmute-banner" class="unmute-banner hidden">
+        Tap to enable audio
+      </button>
     </div>
 
-    <div class="actions">
-      <button id="btn-scan-again" class="btn btn-secondary hidden">Scan QR Again</button>
+    <div class="viewer-controls">
+      <div class="status-panel" id="status-panel">
+        <div class="status-badge" id="badge-connection">
+          <span class="dot" id="dot-connection"></span>
+          <span id="text-connection">Connecting</span>
+        </div>
+        <div class="status-badge hidden" id="badge-battery">
+          <span id="text-battery">Battery: --</span>
+        </div>
+        <div class="status-badge">
+          <span id="text-duration">0:00</span>
+        </div>
+        <div class="status-badge">
+          Audio
+          <div class="audio-meter"><div class="audio-meter-fill" id="audio-meter"></div></div>
+        </div>
+      </div>
+      <div class="actions" id="viewer-actions">
+        <button id="btn-scan-again" class="btn btn-secondary hidden">Scan QR Again</button>
+      </div>
     </div>
   </div>
 
